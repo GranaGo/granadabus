@@ -214,6 +214,9 @@ function resolveMovgrStopId(stop: Stop): string | null {
       const m = /^\s*0*(\d+)\s*$/.exec(stop.apiId);
       return m ? m[1] : null;
     }
+    if (stop.mode === 'interurbano') {
+      return stop.apiId.trim().replace(/^\d+_/, '');
+    }
     return stop.apiId;
   }
 
@@ -235,10 +238,14 @@ function resolveMovgrStopId(stop: Stop): string | null {
     return idTrim;
   }
 
-  // interurbano
+  // interurbano (ej: GTFS Junta usa "3_14628", MovGR API espera "14628")
   if (/^\d+$/.test(idTrim)) return idTrim;
+  const prefixedId = /^\d+_(\d+)$/.exec(idTrim);
+  if (prefixedId) return prefixedId[1];
   if (/^\d+$/.test(codeTrim)) return codeTrim;
-  return idTrim;
+  const prefixedCode = /^\d+_(\d+)$/.exec(codeTrim);
+  if (prefixedCode) return prefixedCode[1];
+  return idTrim.replace(/^\d+_/, '');
 }
 
 export async function fetchStopArrivals(

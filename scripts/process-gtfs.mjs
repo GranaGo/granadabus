@@ -621,12 +621,16 @@ async function attachMovgrApiIds(stops) {
     for (const s of modeStops) {
       const code = String(s.code || '').trim();
       const id = String(s.id || '').trim();
+      const strippedId = id.replace(/^\d+_/, '');
+      const strippedCode = code.replace(/^\d+_/, '');
       const numericCode = /^\d+$/.test(code) ? String(Number(code)) : '';
       const numericId = /^\d+$/.test(id) ? String(Number(id)) : '';
 
       let resolved =
         byExactId.get(id) ||
         byExactId.get(code) ||
+        (strippedId && byExactId.get(strippedId)) ||
+        (strippedCode && byExactId.get(strippedCode)) ||
         (numericId && byExactId.get(numericId)) ||
         (numericCode && byExactId.get(numericCode)) ||
         null;
