@@ -158,7 +158,7 @@ function getGtfsScheduledArrivals(
           items.push({
             lineId,
             lineName: route?.name,
-            color: route?.color || (stop.mode === 'metro' ? '059669' : stop.mode === 'urbano' ? 'DC2626' : '15803D'),
+            color: route?.color || (stop.mode === 'metro' ? '059669' : stop.mode === 'urbano' ? 'DC2626' : '2563EB'),
             textColor: route?.textColor || 'FFFFFF',
             destination: destination || route?.name || `Línea ${lineId}`,
             minutes: diff,
@@ -252,13 +252,6 @@ export async function fetchStopArrivals(
   stop: Stop,
   routesById: Map<string, Route>
 ): Promise<StopArrivalsResult> {
-  const schedules = await loadSchedules();
-  const { items: gtfsArrivals, dayLabel: gtfsDayLabel, hasGtfsData } = getGtfsScheduledArrivals(
-    stop,
-    schedules,
-    routesById
-  );
-
   const apiStopId = resolveMovgrStopId(stop);
 
   if (navigator.onLine && apiStopId) {
@@ -283,7 +276,7 @@ export async function fetchStopArrivals(
         const data = await fetchMovgrJson<RawCtagrArrivalResponse>(`/ctagr/llegadas/${encodeURIComponent(apiStopId)}`);
         liveArrivals = (data.proximos || []).map((p) => {
           const fallbackRoute = routesById.get(`interurbano:${p.linea.id}`);
-          const rawColor = p.linea.color && p.linea.color !== 'FFFFFF' ? p.linea.color : fallbackRoute?.color || '15803D';
+          const rawColor = p.linea.color && p.linea.color !== 'FFFFFF' ? p.linea.color : fallbackRoute?.color || '2563EB';
           return {
             lineId: String(p.linea.id),
             lineName: p.linea.nombre || fallbackRoute?.name,
@@ -316,38 +309,19 @@ export async function fetchStopArrivals(
         }));
       }
 
-      if (liveArrivals.length > 0) {
-        return {
-          source: 'realtime',
-          arrivals: liveArrivals,
-          gtfsArrivals,
-          gtfsDayLabel,
-          hasGtfsData,
-          vehicles,
-        };
-      }
-
-      if (gtfsArrivals.length > 0) {
-        return {
-          source: 'gtfs',
-          arrivals: gtfsArrivals,
-          gtfsArrivals,
-          gtfsDayLabel,
-          hasGtfsData,
-          vehicles,
-          error: 'Sin salidas en directo · Mostrando horario teórico GTFS',
-        };
-      }
-
       return {
         source: 'realtime',
-        arrivals: [],
+        arrivals: liveArrivals,
         gtfsArrivals: [],
-        gtfsDayLabel,
-        hasGtfsData,
         vehicles,
       };
     } catch (err) {
+      const schedules = await loadSchedules();
+      const { items: gtfsArrivals, dayLabel: gtfsDayLabel, hasGtfsData } = getGtfsScheduledArrivals(
+        stop,
+        schedules,
+        routesById
+      );
       if (gtfsArrivals.length > 0) {
         return {
           source: 'gtfs',
@@ -371,6 +345,12 @@ export async function fetchStopArrivals(
     }
   }
 
+  const schedules = await loadSchedules();
+  const { items: gtfsArrivals, dayLabel: gtfsDayLabel, hasGtfsData } = getGtfsScheduledArrivals(
+    stop,
+    schedules,
+    routesById
+  );
   if (gtfsArrivals.length > 0) {
     return {
       source: 'gtfs',

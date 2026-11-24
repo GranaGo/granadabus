@@ -50,7 +50,7 @@ export class GranadaTransitMap {
   private vehicles: VehicleItem[] = [];
   private userLocation: { lat: number; lon: number } | null = null;
   private darkTheme = false;
-  private showGlobalRoutes = true;
+  private showGlobalRoutes = false;
 
   // Cámara Web Mercator
   private centerLon = GRANADA_CENTER_LON;
@@ -298,7 +298,7 @@ export class GranadaTransitMap {
     };
   }
 
-  private getTileUrl(style: 'light_all' | 'dark_all', z: number, x: number, y: number): string {
+  private getTileUrl(style: 'rastertiles/voyager' | 'dark_all', z: number, x: number, y: number): string {
     const sub = CARTO_SUBDOMAINS[(x + y) % CARTO_SUBDOMAINS.length];
     const retina = this.dpr > 1 ? '@2x' : '';
     const apiKey = (import.meta.env.VITE_CARTODB_API_KEY as string | undefined)?.trim();
@@ -306,7 +306,7 @@ export class GranadaTransitMap {
     return `https://${sub}.basemaps.cartocdn.com/${style}/${z}/${x}/${y}${retina}.png${suffix}`;
   }
 
-  private requestTile(style: 'light_all' | 'dark_all', z: number, x: number, y: number): TileEntry {
+  private requestTile(style: 'rastertiles/voyager' | 'dark_all', z: number, x: number, y: number): TileEntry {
     const key = `${style}/${z}/${x}/${y}`;
     const existing = this.tileCache.get(key);
     if (existing) {
@@ -344,7 +344,7 @@ export class GranadaTransitMap {
   }
 
   private drawCartoBasemap(ctx: CanvasRenderingContext2D) {
-    const style = this.darkTheme ? 'dark_all' : 'light_all';
+    const style = this.darkTheme ? 'dark_all' : 'rastertiles/voyager';
     const tileZoom = Math.max(9, Math.min(18, Math.round(this.zoom)));
     const numTiles = Math.pow(2, tileZoom);
     const ws = this.worldSize;
@@ -362,6 +362,11 @@ export class GranadaTransitMap {
     const maxTy = Math.min(numTiles - 1, Math.floor(bottomRightWorldY * numTiles));
 
     const tilePixelSize = ws / numTiles;
+
+    ctx.save();
+    ctx.filter = this.darkTheme
+      ? 'brightness(1.26) contrast(0.88) saturate(1.15)'
+      : 'contrast(1.06) brightness(0.98) saturate(1.08)';
 
     for (let ty = minTy; ty <= maxTy; ty++) {
       for (let tx = minTx; tx <= maxTx; tx++) {
@@ -397,12 +402,13 @@ export class GranadaTransitMap {
         }
 
         if (!drawnFallback) {
-          // Fondo sutil si aún no ha descargado
-          ctx.fillStyle = this.darkTheme ? '#111827' : '#e2e8f0';
+          ctx.fillStyle = this.darkTheme ? '#222838' : '#dde4ee';
           ctx.fillRect(dx, dy, drawW, drawH);
         }
       }
     }
+
+    ctx.restore();
   }
 
   private bindEvents() {
@@ -633,17 +639,18 @@ export class GranadaTransitMap {
     ctx.save();
     ctx.scale(this.dpr, this.dpr);
 
-    ctx.fillStyle = this.darkTheme ? '#0f172a' : '#f1f5f9';
+    ctx.fillStyle = this.darkTheme ? '#1d2230' : '#dde4ee';
     ctx.fillRect(0, 0, w, h);
 
-    // 1. Mapa base CartoDB Positron / Dark Matter
+    // 1. Mapa base CartoDB Voyager (claro con alto contraste) / Dark Matter suave
     this.drawCartoBasemap(ctx);
 
-    const stopBorder = this.darkTheme ? '#0f172a' : '#ffffff';
-    const labelBg = this.darkTheme ? 'rgba(15, 23, 42, 0.92)' : 'rgba(255, 255, 255, 0.94)';
-    const labelText = this.darkTheme ? '#f8fafc' : '#0f172a';
+    const stopBorder = this.darkTheme ? '#1d2230' : '#ffffff';
+    const labelBg = this.darkTheme ? 'rgba(37, 43, 59, 0.94)' : 'rgba(248, 250, 252, 0.96)';
+    const labelText = this.darkTheme ? '#edf1f7' : '#0f172a';
+    const labelStroke = this.darkTheme ? 'rgba(148, 163, 184, 0.35)' : 'rgba(100, 116, 139, 0.35)';
 
-    // 2. Trazados de líneas de Granada (finos y limpios)
+    // 2. Trazados de líneas de Granada (un pelín más gruesos y legibles)
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     const hasSelectedRoute = this.selectedRoute !== null;
@@ -660,46 +667,55 @@ export class GranadaTransitMap {
 
         const baseOpacity = hasSelectedRoute
           ? isSelected
-            ? 0.92
-            : 0.1
+            ? 0.96
+            : 0.14
           : route.mode === 'metro'
-            ? 0.78
+            ? 0.88
             : route.mode === 'urbano'
-              ? 0.36
-              : 0.22;
+              ? 0.62
+              : 0.46;
         const baseWidth = isSelected
-          ? 3.0
+          ? 4.4
           : route.mode === 'metro'
-            ? Math.max(1.8, Math.min(2.6, (this.zoom - 9.5) * 0.55))
+            ? Math.max(2.6, Math.min(3.8, (this.zoom - 9.5) * 0.72))
             : route.mode === 'urbano'
-              ? 1.05
-              : 0.85;
+              ? 1.85
+              : 1.55;
 
         for (const sh of shapes) {
           if (sh.pts.length < 2) continue;
           let colorHex = `#${route.color || 'dc2626'}`;
           if (isSelected && shapes.length > 1 && sh.direction === 1) {
-            colorHex = this.darkTheme ? '#38bdf8' : '#0284c7';
+            colorHex = this.darkTheme ? '#93c5fd' : '#0284c7';
           }
-          ctx.strokeStyle = colorHex;
-          ctx.globalAlpha = baseOpacity;
-          ctx.lineWidth = baseWidth;
+
           ctx.beginPath();
           for (let i = 0; i < sh.pts.length; i++) {
             const [x, y] = this.worldToScreen(sh.pts[i][0], sh.pts[i][1]);
             if (i === 0) ctx.moveTo(x, y);
             else ctx.lineTo(x, y);
           }
+
+          if (isSelected) {
+            ctx.strokeStyle = this.darkTheme ? '#1d2230' : '#ffffff';
+            ctx.globalAlpha = 0.88;
+            ctx.lineWidth = baseWidth + 2.6;
+            ctx.stroke();
+          }
+
+          ctx.strokeStyle = colorHex;
+          ctx.globalAlpha = baseOpacity;
+          ctx.lineWidth = baseWidth;
           ctx.stroke();
         }
       }
       ctx.globalAlpha = 1;
     }
 
-    // 3. Paradas más grandes y accesibles al dedo
-    const showUrbanStops = this.zoom >= 12.4 || hasSelectedRoute;
-    const showInterStops = this.zoom >= 12.8 || hasSelectedRoute;
-    const showMetroStops = this.zoom >= 10.4 || hasSelectedRoute;
+    // 3. Paradas grandes, con buen contraste y accesibles al dedo
+    const showUrbanStops = this.zoom >= 12.2 || hasSelectedRoute;
+    const showInterStops = this.zoom >= 12.6 || hasSelectedRoute;
+    const showMetroStops = this.zoom >= 10.2 || hasSelectedRoute;
     const placedLabels: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
 
     for (const item of this.projectedStops) {
@@ -719,50 +735,77 @@ export class GranadaTransitMap {
       const [x, y] = this.worldToScreen(wx, wy);
       if (x < -25 || y < -25 || x > w + 25 || y > h + 25) continue;
 
-      const modeColor = stop.mode === 'metro' ? '#059669' : stop.mode === 'urbano' ? '#dc2626' : '#15803d';
+      const modeColor = this.darkTheme
+        ? stop.mode === 'metro'
+          ? '#86efac'
+          : stop.mode === 'urbano'
+            ? '#f28b82'
+            : '#93c5fd'
+        : stop.mode === 'metro'
+          ? '#059669'
+          : stop.mode === 'urbano'
+            ? '#dc2626'
+            : '#2563eb';
+
       const baseR =
         stop.mode === 'metro'
-          ? Math.max(6.2, Math.min(10.0, (this.zoom - 9.5) * 1.45))
+          ? Math.max(6.6, Math.min(10.5, (this.zoom - 9.5) * 1.5))
           : isOnSelectedRoute
-            ? 7.8
-            : Math.max(5.0, Math.min(8.8, (this.zoom - 11.0) * 1.4));
+            ? 8.2
+            : Math.max(5.4, Math.min(9.2, (this.zoom - 11.0) * 1.45));
 
-      ctx.globalAlpha = hasSelectedRoute && !isOnSelectedRoute && !isSelectedStop && !isHovered ? 0.25 : 1;
+      ctx.globalAlpha = hasSelectedRoute && !isOnSelectedRoute && !isSelectedStop && !isHovered ? 0.28 : 1;
 
       if (isSelectedStop) {
         ctx.beginPath();
-        ctx.arc(x, y, baseR + 12, 0, Math.PI * 2);
-        ctx.fillStyle = stop.mode === 'metro' ? 'rgba(5,150,105,0.26)' : 'rgba(220,38,38,0.26)';
+        ctx.arc(x, y, baseR + 13, 0, Math.PI * 2);
+        ctx.fillStyle = this.darkTheme
+          ? stop.mode === 'metro'
+            ? 'rgba(134,239,172,0.28)'
+            : stop.mode === 'urbano'
+              ? 'rgba(242,139,130,0.28)'
+              : 'rgba(147,197,253,0.28)'
+          : stop.mode === 'metro'
+            ? 'rgba(5,150,105,0.25)'
+            : stop.mode === 'urbano'
+              ? 'rgba(220,38,38,0.25)'
+              : 'rgba(37,99,235,0.25)';
         ctx.fill();
       }
 
       ctx.beginPath();
-      ctx.arc(x, y, isSelectedStop ? baseR + 3.5 : isHovered ? baseR + 2.5 : baseR, 0, Math.PI * 2);
-      ctx.fillStyle = isSelectedStop ? modeColor : stop.mode === 'metro' ? '#ffffff' : modeColor;
+      ctx.arc(x, y, isSelectedStop ? baseR + 3.8 : isHovered ? baseR + 2.6 : baseR, 0, Math.PI * 2);
+      ctx.fillStyle = isSelectedStop
+        ? modeColor
+        : stop.mode === 'metro'
+          ? this.darkTheme
+            ? '#252b3b'
+            : '#ffffff'
+          : modeColor;
       ctx.fill();
-      ctx.lineWidth = stop.mode === 'metro' ? 3.0 : 2.2;
+      ctx.lineWidth = stop.mode === 'metro' ? 3.2 : 2.5;
       ctx.strokeStyle = stop.mode === 'metro' && !isSelectedStop ? modeColor : stopBorder;
       ctx.stroke();
 
       const shouldDrawLabel =
         isSelectedStop ||
         isHovered ||
-        (stop.mode === 'metro' && this.zoom >= 13.6) ||
-        (isOnSelectedRoute && this.zoom >= 14.2) ||
-        this.zoom >= 16.0;
+        (stop.mode === 'metro' && this.zoom >= 13.5) ||
+        (isOnSelectedRoute && this.zoom >= 14.0) ||
+        this.zoom >= 15.8;
 
       if (shouldDrawLabel) {
         ctx.globalAlpha = 1;
         ctx.font = isSelectedStop
-          ? '600 12px system-ui, -apple-system, sans-serif'
-          : '500 10.5px system-ui, -apple-system, sans-serif';
+          ? '700 12.5px system-ui, -apple-system, sans-serif'
+          : '600 11px system-ui, -apple-system, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         const text = stop.name;
-        const tw = ctx.measureText(text).width + 12;
+        const tw = ctx.measureText(text).width + 14;
         const lx = x;
-        const ly = y - (baseR + 15);
-        const box = { x1: lx - tw / 2, y1: ly - 10, x2: lx + tw / 2, y2: ly + 10 };
+        const ly = y - (baseR + 16);
+        const box = { x1: lx - tw / 2, y1: ly - 11, x2: lx + tw / 2, y2: ly + 11 };
         const overlaps =
           !isSelectedStop &&
           !isHovered &&
@@ -772,8 +815,11 @@ export class GranadaTransitMap {
           placedLabels.push(box);
           ctx.fillStyle = labelBg;
           ctx.beginPath();
-          ctx.roundRect(box.x1, box.y1, tw, 20, 5);
+          ctx.roundRect(box.x1, box.y1, tw, 22, 6);
           ctx.fill();
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = labelStroke;
+          ctx.stroke();
           ctx.fillStyle = labelText;
           ctx.fillText(text, lx, ly);
         }
@@ -800,19 +846,19 @@ export class GranadaTransitMap {
       ctx.fillText('BUS', vx, vy + 0.5);
     }
 
-    // 5. Ubicación del usuario
+    // 5. Ubicación del usuario (distinta a las paradas azules interurbanas)
     if (this.userLocation) {
       const [ux, uy] = this.latLonToScreen(this.userLocation.lat, this.userLocation.lon);
       ctx.beginPath();
-      ctx.arc(ux, uy, 16, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(37, 99, 235, 0.2)';
+      ctx.arc(ux, uy, 17, 0, Math.PI * 2);
+      ctx.fillStyle = this.darkTheme ? 'rgba(165, 180, 252, 0.28)' : 'rgba(79, 70, 229, 0.22)';
       ctx.fill();
 
       ctx.beginPath();
-      ctx.arc(ux, uy, 6.5, 0, Math.PI * 2);
-      ctx.fillStyle = '#2563eb';
+      ctx.arc(ux, uy, 7.2, 0, Math.PI * 2);
+      ctx.fillStyle = this.darkTheme ? '#a5b4fc' : '#4f46e5';
       ctx.fill();
-      ctx.lineWidth = 2.2;
+      ctx.lineWidth = 2.6;
       ctx.strokeStyle = '#ffffff';
       ctx.stroke();
     }

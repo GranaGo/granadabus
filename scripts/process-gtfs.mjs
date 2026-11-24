@@ -299,7 +299,7 @@ function processGtfsMode(mode, files) {
       id: shortName || row.route_id,
       gtfsRouteId: row.route_id,
       name: longName || shortName || row.route_id,
-      color: (row.route_color || (mode === 'metro' ? '059669' : mode === 'urbano' ? 'DC2626' : '15803D')).replace('#', ''),
+      color: (row.route_color || (mode === 'metro' ? '059669' : mode === 'urbano' ? 'DC2626' : '2563EB')).replace('#', ''),
       textColor: (row.route_text_color || 'FFFFFF').replace('#', ''),
       mode,
     });
@@ -525,7 +525,7 @@ async function syncFromMovGrApi() {
     ...ctagrDetails.map((l) => ({
       id: String(l.id),
       name: l.nombre || `Línea ${l.id}`,
-      color: l.color && l.color !== 'FFFFFF' ? l.color.replace('#', '') : '15803D',
+      color: l.color && l.color !== 'FFFFFF' ? l.color.replace('#', '') : '2563EB',
       textColor: 'FFFFFF',
       mode: 'interurbano',
       shapes: convertShapes(l.shapes || []),
