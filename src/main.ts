@@ -777,7 +777,7 @@ async function bootstrap() {
             <div class="text-[15px] md:text-base font-bold text-slate-950 dark:text-[#edf1f7] truncate">${escapeHtml(a.destination)}</div>
             ${
               a.timeText
-                ? `<div class="text-[13px] font-medium text-slate-700 dark:text-[#b4bfd4] tabular-nums">${isTheoretical ? 'Salida GTFS' : 'Hora'} ${escapeHtml(a.timeText)}${a.inRoute ? ' · En ruta' : ''}</div>`
+                ? `<div class="text-[13px] font-medium text-slate-700 dark:text-[#b4bfd4] tabular-nums">${isTheoretical ? 'Hora Offline' : 'Hora'} ${escapeHtml(a.timeText)}${a.inRoute ? ' · En ruta' : ''}</div>`
                 : ''
             }
           </div>
@@ -813,13 +813,13 @@ async function bootstrap() {
         source === 'realtime'
           ? 'Tiempos en directo'
           : source === 'gtfs'
-            ? `Horario teórico GTFS${gtfsDayLabel ? ` · ${gtfsDayLabel}` : ''}`
+            ? `Horario Offline${gtfsDayLabel ? ` · ${gtfsDayLabel}` : ''}`
             : 'Sin datos en directo';
 
       if (arrivals.length === 0) {
         const emptyHint =
           source === 'unavailable' && !hasGtfsData
-            ? 'Añade los archivos GTFS en gtfs/ para activar el respaldo teórico cuando la API falle.'
+            ? 'No hay horarios Offline guardados todavía para esta parada.'
             : '';
         arrivalsHtml = `
           <div class="flex items-center justify-between gap-2 text-[13px] font-semibold text-slate-700 dark:text-[#b4bfd4] mb-2">

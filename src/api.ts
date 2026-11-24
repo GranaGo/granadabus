@@ -330,7 +330,7 @@ export async function fetchStopArrivals(
           gtfsDayLabel,
           hasGtfsData,
           vehicles: [],
-          error: 'API en directo no disponible · Mostrando horario teórico GTFS',
+          error: 'API en directo no disponible · Mostrando horario Offline',
         };
       }
       return {
@@ -360,8 +360,8 @@ export async function fetchStopArrivals(
       hasGtfsData,
       vehicles: [],
       error: !navigator.onLine
-        ? 'Sin conexión · Mostrando horario teórico GTFS'
-        : 'Horario teórico GTFS (parada sin tiempo real en la API)',
+        ? 'Sin conexión · Mostrando horario Offline'
+        : 'Horario Offline (parada sin tiempo real en la API)',
     };
   }
   return {
